@@ -1,75 +1,90 @@
-import {ExcelComponent} from '@core/ExcelComponent';
-import {createTable} from '@/components/table/table.template';
-import {resizeHandler} from '@/components/table/table.resize';
-import {shouldResize} from '@/components/table/table.functions';
+import { ExcelComponent } from '@core/ExcelComponent';
+import { $ } from '@core/dom';
+import { createTable } from './table.template';
+import { resizeHandler } from './table.resize';
+import {
+  shouldResize,
+  isCell,
+  matrix,
+  nextSelector,
+} from './table.functions';
+import { TableSelection } from './TableSelection';
 
 export class Table extends ExcelComponent {
   static className = 'excel__table';
 
-  constructor($root) {
+  constructor($root, options) {
     super($root, {
       name: 'Table',
-      listeners: ['mousedown'],
+      listeners: ['mousedown', 'keydown', 'input'],
+      ...options,
     });
   }
 
   toHTML() {
     return createTable(20);
+  }
 
-    // return `
-    //   <div class="row">
+  prepare() {
+    this.selection = new TableSelection();
+  }
 
-    //     <div class="row-info"></div>
+  init() {
+    super.init();
 
-    //     <div class="row-data">
+    this.selectCell(this.$root.find('[data-id="0:0"]'));
 
-    //       <div class="column">
-    //         A
-    //       </div>
-    //       <div class="column">
-    //         B
-    //       </div>
-    //       <div class="column">
-    //         C
-    //       </div>
+    this.$on('formula:input', (text) => {
+      this.selection.current.text(text);
+    });
 
-    //     </div>
+    this.$on('formula:done', () => {
+      this.selection.current.focus();
+    });
+  }
 
-    //   </div>
-
-    //   <div class="row">
-
-    //     <div class="row-info">1</div>
-
-    //     <div class="row-data">
-
-    //       <div class="cell selected" contenteditable>a1</div>
-    //       <div class="cell" contenteditable>b2</div>
-    //       <div class="cell" contenteditable>c3</div>
-
-    //     </div>
-
-    //   </div>
-
-    //   <div class="row">
-
-    //     <div class="row-info">2</div>
-
-    //     <div class="row-data">
-
-    //       <div class="cell">a1</div>
-    //       <div class="cell">b2</div>
-    //       <div class="cell">c3</div>
-
-    //     </div>
-
-    //   </div>
-    // `;
+  selectCell($cell) {
+    this.selection.select($cell);
+    this.$emit('table:select', $cell);
   }
 
   onMousedown(event) {
     if (shouldResize(event)) {
       resizeHandler(this.$root, event);
+    } else if (isCell(event)) {
+      const $target = $(event.target);
+      if (event.shiftKey) {
+        const $cells = matrix($target, this.selection.current)
+            .map((id) => this.$root.find(`[data-id="${id}"]`));
+
+        this.selection.selectGroup($cells);
+      } else {
+        this.selection.select($target);
+      }
     }
+  }
+
+  onKeydown(event) {
+    const keys = [
+      'Enter',
+      'Tab',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowDown',
+      'ArrowUp',
+    ];
+
+    const { key } = event;
+
+    if (keys.includes(key) && !event.shiftKey) {
+      event.preventDefault();
+      const id = this.selection.current.id(true);
+      const $next = this.$root.find(nextSelector(key, id));
+      this.selectCell($next);
+    }
+  }
+
+  onInput(event) {
+    this.$emit('table:input', $(event.target));
   }
 }
