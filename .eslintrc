@@ -10,6 +10,7 @@
     "require-jsdoc": "off",
     "operator-linebreak": "off",
     "valid-jsdoc": "off",
+    "object-curly-spacing": "off"
   },
   "extends": [
     "eslint:recommended",
